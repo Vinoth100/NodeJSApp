@@ -1,8 +1,0 @@
-{
- "comments" : "Mongo DB connection details",
- "server"   : "localhost",
- "database" : "test",
- "username" : "mongouser",
- "password" : "secret"
-}
-
