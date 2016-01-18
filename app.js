@@ -12,7 +12,7 @@ var app = express();
 var fs= require('fs');
 
 // Application configuration file
-var configurationFile = './configuration.json';
+var configurationFile = './config/configuration.json';
 
 // Application configuration object 
 var configuration;
@@ -26,11 +26,57 @@ var empModel = require('./schema/employee.js');
 // Employee DAO for CRUD operations
 var employeeDAO = require('./dao/employeeDAO.js');
 
+
+
+// Centralized logging
+var appLog = require('./logging/log.js');
+
 // To read the POST operation data 
 var bodyParser = require('body-parser');
 app.use(bodyParser.json()); // support json encoded bodies
 app.use(bodyParser.urlencoded({ extended: true })); // support encoded bodies
 
+/*
+readAppConfiguration method reads the configuration file and stores in global configuration object.
+**/
+var readAppConfiguration = function(){
+
+    try{
+	configuration = JSON.parse(
+			fs.readFileSync(configurationFile)
+		);
+	
+	}catch(err){
+	   appLog.log('ERROR','Exiting app,Error reading config file'+err);
+	   process.exit(0);
+	}
+}
+
+
+
+/*
+validateDbConfiguration - checks the configuration value and returns true 
+
+**/
+var validateDbConfiguration = function(){
+
+
+	if ((configuration.server || configuration.server.length > 0) && (configuration.database || configuration.database.length > 0)){
+	   if(configuration.port ||  configuration.port.length > 0){
+			   var pattern = /^[0-9]{1,5}$/; // Pattern for port number 
+		       try{
+				var result = pattern.test(configuration.port);
+				return result;
+			   }catch(err){
+				 Applog.log('ERROR',err);
+				 return false;
+			   }
+			   
+	  }
+	}
+
+
+}
 
 /*
    getDbUrl method returns a mongodb connection URL
@@ -40,13 +86,11 @@ var getDbUrl = function(){
 
 	var url='';
 
-	configuration = JSON.parse(
-	    fs.readFileSync(configurationFile)
-	);
-
-	if ((configuration.server || configuration.server.length > 0) && (configuration.database || configuration.database.length > 0)) {
+	//if ((configuration.server || configuration.server.length > 0) && (configuration.database || configuration.database.length > 0)) {
+	
+	if(validateDbConfiguration() === true) {
 		url = 'mongodb://';		
-		url += configuration.server+"/"+configuration.database;
+		url += configuration.server+':'+configuration.port+'/'+configuration.database;
 	
 	}else {
 		throw 'Check the server and database configuration value';
@@ -67,31 +111,33 @@ var connectDB = function(){
 		// CONNECTION EVENTS
 		// If the connection throws an error
 		mongoose.connection.on('error',function (err) {
-		console.log('Mongoose default connection error: ' + err);
-		console.log('Closing the application');
+		appLog.log('INFO','Mongoose default connection error: ' + err);
+		appLog.log('INFO','Closing the application');
 		process.exit(0);
 		});
 		
 
 		// When successfully connected
 		mongoose.connection.on('connected', function () {
-		console.log('Mongoose default connection open to ' + url);
+		appLog.log('INFO','Mongoose default connection open to ' + url);
 		});
 
 		
 		// When the connection is disconnected
 		mongoose.connection.on('disconnected', function () {
-		console.log('Mongoose default connection disconnected');
+		appLog.log('INFO','Mongoose default connection disconnected');
 		});
 
 	}
 	catch(err){
-		console.log('Error connecting to DB:'+err);
+		appLog.log('INFO','Error connecting to DB:'+err);
 		// Exit the App 
 		process.exit();
 	}
 }
 
+// Read Application configuration
+readAppConfiguration();
 
 // Connect to DB.
 connectDB();
@@ -138,7 +184,7 @@ app.post('/employee', function (req, res) {
 	
 
 
-	console.log('After save');
+	appLog.log('INFO','After save');
 
    //res.send(instance) ;
     
@@ -175,5 +221,5 @@ app.delete('/employee/:id', function(req,res){
 
 
 app.listen(3000, function () {
-  console.log('Employee app listening on port 3000!');
+  appLog.log('INFO','Employee app listening on port 3000!');
 })
