@@ -132,9 +132,88 @@ var connectDB = function(){
 	catch(err){
 		appLog.log('INFO','Error connecting to DB:'+err);
 		// Exit the App 
-		process.exit();
+		process.exit(0);
 	}
 }
+
+
+
+/*
+isValidate - checks the date format and returns true/false
+Example: 10/12/1979 - returns true 
+**/ 
+var isValidDate =  function (value) {
+
+		var reDate = /(?:0[1-9]|1[0-2])[\/-](?:0[1-9]|[12][0-9]|3[01])[\/-](?:19|20\d{2})/;
+        return reDate.test(value);
+    }
+	
+/*
+isOldEnough - Checks whether the age is greater than 18 years
+dob should be Date object
+**/	
+	
+var isOldEnough = function(dob){
+
+	if (dob instanceof Date) {
+	
+		// Year value calculated based on Unix epoch time
+		var year = 1000*60*60*24*365;
+		var age = (Date.now()-dob)/year;
+		if (age > 18 ) {
+			return true;
+		}else {
+		  return false;
+		}
+	}else {
+		return false;
+	}
+
+}	
+
+/*
+	buildEmployee - constructs employee object from the request
+**/
+var buildEmployee = function(request) {
+
+	if (request.body.id) {
+		if (validateEmployeeId(request.body.id) === true){
+			var dob = new Date(request.body.date);
+			
+			if (isOldEnough(dob) === true){
+				var employee = new empModel();
+				employee.id = request.body.id;
+				employee.name = request.body.name;
+				employee.location = request.body.location;
+				employee.dob = request.body.date;
+				return employee;
+			}else{
+				throw 'Not old enough to be employee';
+			}
+		}else {
+				throw 'Invalid Date of Birth';
+		
+		}
+	}else {
+		throw 'Not a valid employee id';
+	}
+
+}
+
+/*
+  validateEmployee - Basic checks on the requested employee
+**/
+var validateEmployeeId = function(employeeId){
+
+	// Check whether employee id is digits and max length of 5
+	var empIdPattern = /^[0-9]{1,5}$/; 
+	return empIdPattern.test(employeeId);
+	 
+	// Check the Date of Birth is valid date and 18 yrs old
+	
+	
+}
+
 
 // Read Application configuration
 readAppConfiguration();
@@ -164,29 +243,19 @@ employeeDAO.getAllEmployees(response);
 
 
 //Add new employee
-app.post('/employee', function (req, res) {
+app.post('/employee', function (request, response) {
 	
-	var instance = new empModel();
-	instance.id = req.body.id;
-	instance.name = req.body.name;
-	instance.location = req.body.location;
-	instance.dob = req.body.date;
-	
-	empModel.findOne({id:req.body.id},function(err,data){
-		if(err) console.error(err);
-		
-		if(!data || data.length === 0){
-				instance.save(function(err){console.error(err);});
-				res.send('Inserted');
-		}else res.send('Employee already exist');
-	
-	});
-	
+	var employee;
 
-
+	try{
+	employee = buildEmployee(request);
+	employeeDAO.insertEmployee(employee,response);
 	appLog.log('INFO','After save');
-
-   //res.send(instance) ;
+	}catch(err){
+		appLog.log('Error',err);
+		response.send(err);
+	}
+	
     
 });
 
@@ -196,12 +265,9 @@ app.put('/employee', function(req,res){
 	var update = {name:req.body.name};
 	empModel.findOneAndUpdate({id:req.body.id}, update,function(err,list){ 
 		if(err) console.error(err);
-		//list.remove();
 		if (!list || list.length ===0) {res.send('Employee not found');}
 		else res.send('Updated ' + list);
 	});
-	
-	//res.send(req.params.id);
 });
 
 
