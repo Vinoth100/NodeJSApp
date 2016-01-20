@@ -17,7 +17,7 @@ exports.getAllEmployees = function(response){
 
 }
 /*
-insertEmployee - Insert employee into the DB 
+insertEmployee - Insert employee into the DB   
 **/
 exports.insertEmployee = function(employee, response){
 
