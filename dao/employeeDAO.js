@@ -10,10 +10,29 @@ exports.getAllEmployees = function(response){
 			throw err;
 		}
 		console.log('Read success');
-                response.send(empList);
+        response.send(empList);
 		//return empList;
 	});
 
+
+}
+/*
+insertEmployee - Insert employee into the DB 
+**/
+exports.insertEmployee = function(employee, response){
+
+   	
+	empModel.findOne({id:employee.id},function(err,data){
+			if(err) console.error(err);
+			
+			if(!data || data.length === 0){
+					employee.save(function(err){console.error(err);});
+					response.send('Inserted');
+			}else {
+				response.send('Employee already exist');
+			}
+		
+		});
 
 }
 
