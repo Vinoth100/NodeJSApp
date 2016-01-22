@@ -5,6 +5,9 @@
 // Express JS - NodeJS Web App Framework 
 var express = require('express');
 
+// Asynchronous call library
+var async = require('async');
+
 // Express application object
 var app = express();
 
@@ -160,6 +163,7 @@ var isOldEnough = function(dob){
 		// Year value calculated based on Unix epoch time
 		var year = 1000*60*60*24*365;
 		var age = (Date.now()-dob)/year;
+
 		if (age > 18 ) {
 			return true;
 		}else {
@@ -178,14 +182,14 @@ var buildEmployee = function(request) {
 
 	if (request.body.id) {
 		if (validateEmployeeId(request.body.id) === true){
-			var dob = new Date(request.body.date);
+			var dob = new Date(request.body.dob);
 			
 			if (isOldEnough(dob) === true){
 				var employee = new empModel();
 				employee.id = request.body.id;
 				employee.name = request.body.name;
 				employee.location = request.body.location;
-				employee.dob = request.body.date;
+				employee.dob = request.body.dob;
 				return employee;
 			}else{
 				throw 'Not old enough to be employee';
@@ -242,6 +246,7 @@ employeeDAO.getAllEmployees(response);
 });
 
 
+/*
 //Add new employee
 app.post('/employee', function (request, response) {
 	
@@ -259,15 +264,124 @@ app.post('/employee', function (request, response) {
     
 });
 
+*/
+
+
+//Add new employee
+app.post('/employee', function (request, response) {
+
+    var employee;
+    
+    async.series([
+            // Flavor 1: Calling a function which is blocking
+            // and working on its return value - buildEmployee method
+            function(callback){
+                try {
+                    // Your existing buildEmployee method which performs
+                    // basic validation of the request object
+                    employee = buildEmployee(request);
+		    
+		    //console.log('Employee'+employee);	
+                    callback(null);
+ 		 	
+                } catch (err) {
+                    callback(err);
+                }
+            },
+            // Flavor 2: Calling a function which is non-blocking,
+            // however, working on the value it sent in the callback
+            // employeeDao.findEmployeeById method
+            function(callback){
+                // Check whether the employee already exist
+                employeeDAO.findEmployeeById(employee.id, function(err,employee) {
+                        if (err) {
+ 			    //console.log('Inside Error');
+                            // Employee doesn't exist which is fine for us
+                            callback(null);
+                        } else {
+                            callback('Employee with the id already exist', null);
+                        }
+                    }
+                )},
+            // Flavor 3: Calling a function which is non-blocking,
+            // however, just propagating whatever it sent to the callback object
+            // employeeDao.insertEmployee method
+            function(callback){
+                // Insert the employee
+                employeeDAO.insertEmployee(employee, callback);
+            }
+        ],
+        function(err, results){
+   
+	    // Send the response with the appropriate http error code
+            // I haven't classified a validation failure or a duplicate failure.
+            // Just marking everything as 400.
+
+            if (err) {
+                console.log('Error inserting employee: ' + employee.name
+                    + ' Detailed err: ' + err);
+                response.status(400).send({ error: err });
+            } else {
+                console.log('Employee ' + employee.name + ' successfully inserted');
+                response.send("Successfully created the employee");
+            }
+        });
+});
+
+
+
+
 // Update one record
-app.put('/employee', function(req,res){
-	
-	var update = {name:req.body.name};
-	empModel.findOneAndUpdate({id:req.body.id}, update,function(err,list){ 
-		if(err) console.error(err);
-		if (!list || list.length ===0) {res.send('Employee not found');}
-		else res.send('Updated ' + list);
-	});
+app.put('/employee', function(request,response){
+	var employee;
+	console.log('Before async series');
+
+	async.series([
+		      //Build employee object
+		      function(callback){
+		        console.log('first function');
+			try{
+				employee = buildEmployee(request);
+				console.log('emp id:'+employee.id);
+				callback(null);
+			}catch(err){
+				callback(err);		
+			}
+		      },
+			
+        // Find and update if employee exists
+		    function(callback) {
+		         console.log('Second function');
+			 console.log('emp:'+employee); 
+			 employeeDAO.findOneAndUpdate(employee,function(err,employee){
+			 if (err){
+				console.log('Emp not found');
+				callback('Employee not found');
+			 }else{
+			       	callback(null);
+			 }
+ 
+			 });
+
+		    }
+/*,	
+        // Update if exists
+		    function(callback){
+			employeeDAO.updateEmployee(employee,callback);
+		    }
+**/	],			
+	// Respond based on the error
+		    function(err,results){
+			
+			if (err){
+			   response.send('Unable to update:'+err);    	
+			}else{
+			  response.send('Updated successfully'); 
+			}
+		    }
+	);
+
+
 });
 
 
